@@ -239,10 +239,8 @@ export function sup(n: number): string {
 }
 
 export function fmtNum(n: number): string {
-  if (!Number.isFinite(n)) return "∞";
-  const r = Math.round(n);
-  if (Math.abs(n - r) < 1e-7) return String(r);
-  return String(Math.round(n * 100) / 100);
+  if (!Number.isFinite(n)) return n < 0 ? "−∞" : "∞";
+  return Number(n.toPrecision(6)).toString();
 }
 
 /** «x³ − 5x² = 0» */
@@ -293,8 +291,7 @@ export function factorial(n: number): number {
 
 export function clampHp(v: number): number {
   if (!Number.isFinite(v)) return 999;
-  const f = Math.floor(v);
-  return Math.max(-999, Math.min(999, f));
+  return Math.max(-999, Math.min(999, v));
 }
 
 export function reverseDigits(n: number): number {

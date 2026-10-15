@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { HpValue } from "./HpValue";
+import { hpFromRoot, isZeroHp, numericLabel, rootLabel } from "../game/numeric";
 import { GraphPlot } from "./GraphPlot";
 import { isCritical } from "../game/engine";
 import { allRoots, degree, fmtNum, polyTerms, realRoots } from "../game/math";
-import type { HpState, PlayerState, Side } from "../game/types";
+import type { HpState, NumericHp, PlayerState, Side } from "../game/types";
 import { cn } from "../utils/cn";
 
 interface Props {
@@ -58,11 +60,11 @@ export function HpPanel({ player, startHp, side, active, showGraph }: Props) {
       {hp.kind === "number" && hp.divisionByZero ? (
         <div className="mt-3 rounded-lg border border-neon-red/40 bg-neon-red/10 p-3" role="status">
           <div className="font-display text-2xl font-black text-neon-red">HP НЕ ВИЗНАЧЕНО</div>
-          <div className="mt-1 font-mono text-xs text-white/60">До ÷0: {hp.value} HP. Відкат ↶ поверне це значення; Обмін ⇄ передасть стан супернику.</div>
+          <div className="mt-1 font-mono text-xs text-white/60">До ÷0: {numericLabel(hp)} HP. Відкат ↶ поверне це значення; Обмін ⇄ передасть стан супернику.</div>
           <div className="mt-2 font-mono text-xs text-neon-amber">Виправте до кінця свого ходу.</div>
         </div>
       ) : hp.kind === "number" ? (
-        <NumberHp value={hp.value} startHp={startHp} delta={delta} accent={accent} side={side} />
+        <NumberHp hp={hp} startHp={startHp} delta={delta} accent={accent} side={side} />
       ) : (
         <EquationHp hp={hp} delta={delta} showGraph={showGraph} />
       )}
@@ -73,7 +75,7 @@ export function HpPanel({ player, startHp, side, active, showGraph }: Props) {
 function hpValue(hp: HpState): number {
   if (hp.kind === "number") return hp.value;
   const r = realRoots(hp.poly);
-  return r.length ? Math.floor(Math.max(...r)) : -1;
+  return r.length ? Math.max(...r) : -1;
 }
 
 function KindBadge({ hp }: { hp: HpState }) {
@@ -86,10 +88,11 @@ function KindBadge({ hp }: { hp: HpState }) {
   return <span className={cn("rounded border px-1.5 py-0.5 font-mono text-[10px] tracking-widest", m.c)}>{m.t}</span>;
 }
 
-function NumberHp({ value, startHp, delta, accent, side }: { value: number; startHp: number; delta: number | null; accent: string; side: Side }) {
+function NumberHp({ hp, startHp, delta, accent, side }: { hp: NumericHp; startHp: number; delta: number | null; accent: string; side: Side }) {
+  const value = hp.value;
   const max = Math.max(startHp, Math.abs(value), 1);
   const pct = Math.min(50, (Math.abs(value) / max) * 50);
-  const zero = value === 0;
+  const zero = isZeroHp(hp);
   const negative = value < 0;
   return (
     <div className="mt-1 flex items-end gap-4">
@@ -102,14 +105,14 @@ function NumberHp({ value, startHp, delta, accent, side }: { value: number; star
           )}
           style={{ textShadow: zero ? "0 0 26px rgba(255,77,77,.8)" : undefined }}
         >
-          {value}
+          <HpValue hp={hp} />
         </div>
         {delta !== null && delta !== 0 && (
           <div
             key={`d${value}`}
             className={cn("pop-in absolute -right-10 top-1 font-mono text-sm font-bold", delta > 0 ? "text-neon-lime" : "text-neon-magenta")}
           >
-            {delta > 0 ? `+${delta}` : delta}
+            {delta > 0 ? `+${fmtNum(delta)}` : fmtNum(delta)}
           </div>
         )}
         {zero && <div className="mt-1 font-mono text-[10px] tracking-[0.3em] text-neon-red">ОБНУЛЕННЯ</div>}
@@ -159,7 +162,7 @@ function EquationHp({ hp, delta, showGraph }: { hp: Extract<HpState, { kind: "eq
           <span className="text-white/40">= 0</span>
           {delta !== null && delta !== 0 && (
             <span className={cn("pop-in font-mono text-sm", delta > 0 ? "text-neon-lime" : "text-neon-magenta")}>
-              {delta > 0 ? `+${delta}` : delta}
+              {delta > 0 ? `+${fmtNum(delta)}` : fmtNum(delta)}
             </span>
           )}
         </div>
@@ -183,13 +186,13 @@ function EquationHp({ hp, delta, showGraph }: { hp: Extract<HpState, { kind: "eq
                 )}
                 title={r.multiplicity > 1 ? `кратність ${r.multiplicity}` : undefined}
               >
-                x = {complex ? `${fmtNum(r.re)} ${r.im > 0 ? "+" : "−"} ${fmtNum(Math.abs(r.im))}i` : fmtNum(r.re)}
+                x = {complex ? `${fmtNum(r.re)} ${r.im > 0 ? "+" : "−"} ${fmtNum(Math.abs(r.im))}i` : rootLabel(hp.poly, r.re)}
                 {r.multiplicity > 1 && <sup className="ml-0.5 text-[9px]">×{r.multiplicity}</sup>}
               </span>
             );
           })}
           {real.length > 0 && !real.some((r) => Math.abs(r) < 1e-9) && (
-            <span className="font-mono text-[10px] text-neon-lime/70">→ HP {Math.floor(Math.max(...real))}</span>
+            <span className="font-mono text-[10px] text-neon-lime/70">→ HP {numericLabel(hpFromRoot(hp.poly, Math.max(...real)))}</span>
           )}
         </div>
       </div>

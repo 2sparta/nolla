@@ -9,6 +9,7 @@ import {
   type Poly,
   type Root,
 } from "./math";
+import { rootLabel } from "./numeric";
 import type { CardDef, CardId } from "./types";
 
 export const CARDS: Record<CardId, CardDef> = {
@@ -38,14 +39,14 @@ export const CARDS: Record<CardId, CardDef> = {
   },
   times2: {
     id: "times2", symbol: "×2", name: "Подвоєння", cost: 2, category: "math", accent: "cyan",
-    desc: "HP ×2 — собі, або подвоєння коефіцієнтів рівняння.",
-    rule: "Ліва/обидві частини: усі коефіцієнти ×2 (корені ті самі).",
+    desc: "HP ×2. Для дробу оберіть чисельник або знаменник.",
+    rule: "Дріб a/b: чисельник → 2a/b; знаменник → a/(2b). Рівняння: коефіцієнти ×2, корені ті самі.",
     count: 2, onNumber: true, onEquation: true, zones: true, needsRoot: false, resolves: false,
   },
   div2: {
     id: "div2", symbol: "÷2", name: "Розтин", cost: 2, category: "math", accent: "cyan",
-    desc: "HP ÷2 (округлення вниз).",
-    rule: "Дробове число завжди округлюється вниз.",
+    desc: "HP ÷2 — дробове значення зберігається.",
+    rule: "1 ÷ 2 = 1/2; −3 ÷ 2 = −3/2. Дроби автоматично скорочуються.",
     count: 2, onNumber: true, onEquation: true, zones: true, needsRoot: false, resolves: false,
   },
   square: {
@@ -56,13 +57,13 @@ export const CARDS: Record<CardId, CardDef> = {
   },
   sqrt: {
     id: "sqrt", symbol: "√x", name: "Корінь", cost: 2, category: "math", accent: "lime",
-    desc: "HP = ⌊√HP⌋.",
+    desc: "HP = √HP. Дроби зберігаються; ірраціональний результат позначається ≈.",
     rule: "Лише для HP ≥ 0. Не застосовується до рівнянь.",
     count: 2, onNumber: true, onEquation: false, zones: false, needsRoot: false, resolves: false,
   },
   fact: {
     id: "fact", symbol: "x!", name: "Факторіал", cost: 3, category: "math", accent: "amber",
-    desc: "HP = HP! (дозволено лише для 0 ≤ HP ≤ 6).",
+    desc: "HP = HP! (лише цілі HP від 0 до 6).",
     rule: "0! = 1. Факторіал рівняння не визначено.",
     count: 1, onNumber: true, onEquation: false, zones: false, needsRoot: false, resolves: false,
   },
@@ -104,8 +105,8 @@ export const CARDS: Record<CardId, CardDef> = {
   },
   times0: {
     id: "times0", symbol: "×0", name: "Анігіляція", cost: 4, category: "forbidden", accent: "red",
-    desc: "HP ×0 → 0. Супротивник входить у стан «Обнулення».",
-    rule: "Рівняння: 0 = 0 — тотожність, колапсує в HP = 1 (безпечно!).",
+    desc: "HP ×0 → 0. Для дробу оберіть чисельник або знаменник.",
+    rule: "Чисельник ×0 → HP = 0; знаменник ×0 → колапс після ÷0. Рівняння: тотожність, HP = 1.",
     count: 1, onNumber: true, onEquation: true, zones: false, needsRoot: false, resolves: false,
   },
   div0: {
@@ -122,7 +123,7 @@ export const CARDS: Record<CardId, CardDef> = {
   },
   mirror: {
     id: "mirror", symbol: "⟲", name: "Дзеркало", cost: 3, category: "transform", accent: "violet",
-    desc: "Цифри перевертаються зі збереженням знака (−21 → −12). Рівняння: x → −x.",
+    desc: "Лише ціле HP: цифри зі збереженням знака (−21 → −12). Рівняння: x → −x.",
     rule: "Корені рівняння стають протилежними: 5 → −5. Від’ємні корені зберігаються.",
     count: 1, onNumber: true, onEquation: true, zones: false, needsRoot: false, resolves: false,
   },
@@ -153,7 +154,7 @@ export const CARDS: Record<CardId, CardDef> = {
   vieta: {
     id: "vieta", symbol: "Вієт", name: "Теорема Вієта", cost: 2, category: "helper", accent: "amber",
     desc: "Обрати будь-який дійсний корінь (степінь 2 або 3).",
-    rule: "HP = ⌊корінь⌋, рівняння скасовується.",
+    rule: "HP = корінь без округлення, рівняння скасовується.",
     count: 2, onNumber: false, onEquation: true, zones: false, needsRoot: true, resolves: true,
   },
   factor: {
@@ -259,7 +260,7 @@ export function rootOptions(id: CardId, poly: Poly): RootOption[] {
     const complex = Math.abs(r.im) > 1e-7;
     opts.push({
       value: r,
-      label: complex ? `${fmt(r.re)} ${r.im > 0 ? "+" : "−"} ${fmt(Math.abs(r.im))}i` : fmt(r.re),
+      label: complex ? `${fmt(r.re)} ${r.im > 0 ? "+" : "−"} ${fmt(Math.abs(r.im))}i` : rootLabel(poly, r.re),
       dangerous: !complex && Math.abs(r.re) < 1e-9,
       disabled: false,
       note: complex
@@ -269,7 +270,7 @@ export function rootOptions(id: CardId, poly: Poly): RootOption[] {
           : Math.abs(r.re) < 1e-9
             ? "НЕБЕЗПЕЧНИЙ КОРІНЬ"
             : !isInteger(r.re)
-              ? "округлиться вниз"
+              ? "дробове HP збережеться"
               : undefined,
     });
   };

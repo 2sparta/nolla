@@ -1,8 +1,9 @@
 import { CARDS } from "../game/cards";
 import { rootOptions } from "../game/cards";
 import { canCompleteMove, checkMove, hpLabel, isCritical, previewMove } from "../game/engine";
-import { SUBSTITUTION_SHIFTS, substitutionLabel, fmtNum } from "../game/math";
-import type { GameState, Move, Side, Zone } from "../game/types";
+import { numericMultiplier } from "../game/numeric";
+import { SUBSTITUTION_SHIFTS, substitutionLabel } from "../game/math";
+import type { FractionPart, GameState, Move, Side, Zone } from "../game/types";
 import { cn } from "../utils/cn";
 
 export type Pending = Move;
@@ -14,6 +15,7 @@ interface Props {
   onZone: (z: Zone) => void;
   onRoot: (r: number) => void;
   onSubstitution: (shift: number) => void;
+  onFractionPart: (part: FractionPart) => void;
   onCancel: () => void;
 }
 
@@ -23,14 +25,15 @@ const ZONES: { id: Zone; label: string; hint: string }[] = [
   { id: "both", label: "Обидві частини", hint: "зберігає рівновагу або створює тотожність" },
 ];
 
-export function ActionDock({ state, pending, onTarget, onZone, onRoot, onSubstitution, onCancel }: Props) {
+export function ActionDock({ state, pending, onTarget, onZone, onRoot, onSubstitution, onFractionPart, onCancel }: Props) {
   const inst = state.players[0].hand.find((c) => c.uid === pending.cardUid);
   if (!inst) return null;
   const def = CARDS[inst.id];
   const probe = checkMove(state, 0, pending);
+  const multiplier = numericMultiplier(def.id) ?? 2;
 
-  const step = probe.ok ? 0 : probe.needsTarget ? 1 : probe.needsZone ? 2 : probe.needsRoot ? 3 : probe.needsSubstitution ? 4 : 0;
-  const total = (def.id === "swap" ? 0 : 1) + (def.zones && (probe.needsZone || pending.zone !== undefined) ? 1 : 0) + (def.needsRoot ? 1 : 0) + (def.needsSubstitution ? 1 : 0) || 1;
+  const step = probe.ok ? 0 : probe.needsTarget ? 1 : probe.needsZone ? 2 : probe.needsRoot ? 3 : probe.needsSubstitution ? 4 : probe.needsFractionPart ? 5 : 0;
+  const total = (def.id === "swap" ? 0 : 1) + (def.zones && (probe.needsZone || pending.zone !== undefined) ? 1 : 0) + (def.needsRoot ? 1 : 0) + (def.needsSubstitution ? 1 : 0) + (probe.needsFractionPart || pending.fractionPart ? 1 : 0) || 1;
 
   return (
     <div className="panel pop-in relative z-30 rounded-xl border-neon-cyan/30 px-4 py-3">
@@ -95,7 +98,7 @@ export function ActionDock({ state, pending, onTarget, onZone, onRoot, onSubstit
                     </span>
                   ) : selectable ? (
                     !leg.ok ? (
-                      <span className="text-neon-amber">Далі: {leg.needsRoot ? "оберіть корінь" : leg.needsSubstitution ? "оберіть підстановку" : "оберіть частину рівняння"}</span>
+                      <span className="text-neon-amber">Далі: {leg.needsRoot ? "оберіть корінь" : leg.needsSubstitution ? "оберіть підстановку" : leg.needsFractionPart ? "оберіть чисельник або знаменник" : "оберіть частину рівняння"}</span>
                     ) :
                     crit.critical ? (
                       <span className="text-neon-red">критичний стан: {crit.reason}</span>
@@ -143,6 +146,26 @@ export function ActionDock({ state, pending, onTarget, onZone, onRoot, onSubstit
               </button>
             );
           })}
+        </div>
+      )}
+
+      {step === 5 && (
+        <div>
+          <div className="mb-2 font-mono text-[10.5px] tracking-wider text-white/40">ЩО ПОМНОЖИТИ НА {multiplier}?</div>
+          <div className="grid grid-cols-2 gap-2">
+            {(["numerator", "denominator"] as const).map((fractionPart) => {
+              const sim = previewMove(state, 0, { ...pending, fractionPart });
+              const hp = sim?.players[pending.target ?? 0].hp;
+              return (
+                <button key={fractionPart} type="button" disabled={!sim} onClick={() => onFractionPart(fractionPart)}
+                  className="rounded-lg border border-neon-cyan/40 bg-neon-cyan/10 p-3 text-left transition hover:border-neon-cyan hover:bg-neon-cyan/20 disabled:opacity-40">
+                  <div className="font-display text-[11px] font-bold text-neon-cyan">{fractionPart === "numerator" ? "Чисельник" : "Знаменник"} ×{multiplier}</div>
+                  <div className="mt-1 font-mono text-[10px] text-white/45">{fractionPart === "numerator" ? `Значення дробу ×${multiplier}` : multiplier === 0 ? "Колапс після ділення на нуль" : `Значення дробу ÷${multiplier}`}</div>
+                  {hp && <div className="mt-2 font-mono text-lg font-bold text-white">HP → {hpLabel(hp)}</div>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -202,7 +225,7 @@ export function ActionDock({ state, pending, onTarget, onZone, onRoot, onSubstit
                     </div>
                     <div className="font-mono text-[9.5px] text-white/45">{o.note ?? (isHorner ? "прибере цей корінь" : "безпечний корінь")}</div>
                     {thp && !isHorner && (
-                      <div className="mt-1 border-t border-white/10 pt-1 font-mono text-[10px] text-white/60">HP → {fmtNum(thp.kind === "number" ? thp.value : 0)}</div>
+                      <div className="mt-1 border-t border-white/10 pt-1 font-mono text-[10px] text-white/60">HP → {hpLabel(thp)}</div>
                     )}
                     {isHorner && sim && (
                       <div className="mt-1 border-t border-white/10 pt-1 font-mono text-[10px] text-white/60">{hpLabel(sim.players[pending.target ?? 0].hp)}</div>

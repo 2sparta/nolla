@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ambient } from "./Ambient";
 import { GraphPlot } from "./GraphPlot";
+import { HpValue } from "./HpValue";
 import { HpPanel } from "./HpPanel";
 import { CardBack, CardView } from "./CardView";
 import { ActionDock, type Pending } from "./ActionDock";
@@ -167,7 +168,7 @@ export function GameScreen({ mode, puzzleIndex = 0, onExit, onOpenPuzzle }: Prop
     }
     const probe = checkMove(state, 0, { cardUid: uid });
     if (probe.ok) return doMove({ cardUid: uid });
-    if (probe.needsTarget || probe.needsZone || probe.needsRoot || probe.needsSubstitution) return setPending({ cardUid: uid });
+    if (probe.needsTarget || probe.needsZone || probe.needsRoot || probe.needsSubstitution || probe.needsFractionPart) return setPending({ cardUid: uid });
     setToast(probe.reason);
   };
 
@@ -176,7 +177,7 @@ export function GameScreen({ mode, puzzleIndex = 0, onExit, onOpenPuzzle }: Prop
     const next: Pending = { ...pending, target: t };
     const probe = checkMove(state, 0, next);
     if (probe.ok) return doMove(next);
-    if (probe.needsZone || probe.needsRoot || probe.needsSubstitution) return setPending(next);
+    if (probe.needsZone || probe.needsRoot || probe.needsSubstitution || probe.needsFractionPart) return setPending(next);
     setToast(probe.reason);
     setPending(next);
   };
@@ -355,6 +356,7 @@ export function GameScreen({ mode, puzzleIndex = 0, onExit, onOpenPuzzle }: Prop
               onZone={onZone}
               onRoot={onRoot}
               onSubstitution={(substitution) => pending && doMove({ ...pending, substitution })}
+              onFractionPart={(fractionPart) => pending && doMove({ ...pending, fractionPart })}
               onCancel={() => setPending(null)}
             />
           )}
@@ -565,7 +567,7 @@ function Arena({ state }: { state: GameState }) {
             <div className="flex h-[180px] items-center justify-center">
               <div className="text-center">
                 <div className="font-display text-5xl font-black tabular-nums" style={{ color: p.side === 0 ? "#3ce7ff" : "#ff3d8b", textShadow: "0 0 30px currentColor" }}>
-                  {p.hp.divisionByZero ? "∅" : p.hp.value}
+                  {p.hp.divisionByZero ? "∅" : <HpValue hp={p.hp} />}
                 </div>
                 <div className="mt-1 font-mono text-[9.5px] tracking-[0.3em] text-white/30">HP · {p.hp.divisionByZero ? "КОЛАПС ÷0" : "ЧИСЛО"}</div>
               </div>
@@ -590,7 +592,7 @@ function ArenaNumber({ hp, color, label, align }: { hp: GameState["players"][0][
         className="pop-in font-display text-6xl font-black leading-none tabular-nums sm:text-7xl"
         style={{ color, textShadow: `0 0 36px ${color}` }}
       >
-        {v}
+        {hp.kind === "number" && !collapsed ? <HpValue hp={hp} /> : v}
       </div>
       <div className="font-mono text-[9.5px] tracking-[0.3em] text-white/25">{collapsed ? "КОЛАПС ÷0" : "HP"}</div>
     </div>

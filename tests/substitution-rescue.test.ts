@@ -68,7 +68,7 @@ test("substitution can rescue a zero root or create one for an opponent", () => 
 test("substitution picker renders all four previews after selecting the target", () => {
   const state = setup("substitute", { kind: "equation", poly: [0, -5, 1] });
   const html = renderToStaticMarkup(createElement(ActionDock, {
-    state, pending: { cardUid: "test", target: 1 }, onTarget() {}, onZone() {}, onRoot() {}, onSubstitution() {}, onCancel() {},
+    state, pending: { cardUid: "test", target: 1 }, onTarget() {}, onZone() {}, onRoot() {}, onSubstitution() {}, onFractionPart() {}, onCancel() {},
   }));
   assert.ok(html.includes("x → x + 1"));
   assert.ok(html.includes("x → x − 3"));

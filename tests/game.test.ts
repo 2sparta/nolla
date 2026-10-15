@@ -4,6 +4,8 @@ import { buildDeck, card } from "../src/game/cards";
 import { aiDecide } from "../src/game/ai";
 import { checkMove, createGame, endTurn, hpStrength, isCritical, legalMoves, playMove, previewMove } from "../src/game/engine";
 import { clampHp, reverseDigits } from "../src/game/math";
+import { fraction } from "../src/game/fractions";
+import { hpFromFraction } from "../src/game/numeric";
 import { PUZZLES } from "../src/game/puzzles";
 import type { CardId, HpState, Move, Side } from "../src/game/types";
 
@@ -53,10 +55,10 @@ test("negative players can use ordinary cards and cross zero to a safe positive 
   assert.equal(next.turn, 0);
 });
 
-test("arithmetic retains signs, downward rounding and symmetric limits", () => {
+test("arithmetic retains signs, fractions and symmetric limits", () => {
   assert.deepEqual(result("minus1", 0), hp(-1));
   assert.deepEqual(result("times2", -5), hp(-10));
-  assert.deepEqual(result("div2", -3), hp(-2));
+  assert.deepEqual(result("div2", -3), hpFromFraction(fraction(-3, 2)));
   assert.deepEqual(result("square", -5), hp(25));
   assert.equal(clampHp(-10000), -999);
   assert.equal(clampHp(10000), 999);

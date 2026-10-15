@@ -1,11 +1,9 @@
 import {
-  clampHp,
   substituteVariable,
   SUBSTITUTION_SHIFTS,
   substitutionLabel,
   degree,
   evalPoly,
-  factorial,
   fmtNum,
   hasZeroRoot,
   hornerDivide,
@@ -15,12 +13,12 @@ import {
   negateVariable,
   polyToString,
   realRoots,
-  reverseDigits,
   scalePoly,
   addConst,
   type Poly,
 } from "./math";
 import { CARDS, buildDeck, card, helperAvailability, rootOptions } from "./cards";
+import { applyNumeric, hpFromRoot, isFractionHp, isIntegerHp, isZeroHp, numericLabel, numericMultiplier, numericPoly } from "./numeric";
 import type { CardId, CardInstance, GameState, HpState, LogTone, Mode, Move, PlayerState, Side, Zone } from "./types";
 
 let uidCounter = 0;
@@ -138,7 +136,7 @@ export interface CriticalInfo {
 export function isCritical(hp: HpState): CriticalInfo {
   if (hp.kind === "number") {
     if (hp.divisionByZero) return { critical: true, reason: "Колапс після ÷0: потрібен Відкат або Обмін", kind: "division-zero" };
-    return hp.value === 0
+    return isZeroHp(hp)
       ? { critical: true, reason: "Обнулення: HP = 0", kind: "zero" }
       : { critical: false, reason: "", kind: null };
   }
@@ -164,12 +162,12 @@ export function hpStrength(hp: HpState): number {
   if (hp.kind === "number") return isCritical(hp).critical ? -60 : Math.abs(hp.value);
   if (isCritical(hp).critical) return -60;
   const roots = realRoots(hp.poly);
-  const best = roots.length ? Math.max(...roots.map((r) => Math.abs(Math.floor(r)))) : 0;
+  const best = roots.length ? Math.max(...roots.map((r) => Math.abs(r))) : 0;
   return best * (hp.kind === "graph" ? 0.92 : 0.95) - 1;
 }
 
 export function hpLabel(hp: HpState): string {
-  if (hp.kind === "number") return hp.divisionByZero ? "не визначено (÷0)" : String(hp.value);
+  if (hp.kind === "number") return hp.divisionByZero ? "не визначено (÷0)" : numericLabel(hp);
   return polyToString(hp.poly);
 }
 
@@ -184,6 +182,7 @@ export interface Legality {
   needsZone: boolean;
   needsRoot: boolean;
   needsSubstitution?: boolean;
+  needsFractionPart?: boolean;
   needsTarget: boolean;
   zones: Zone[];
 }
@@ -234,8 +233,13 @@ export function checkMove(state: GameState, actor: Side, move: Move): Legality {
         needsTarget: true,
       });
     }
-    if (def.id === "fact" && (th.value > 6 || th.value < 0)) return fail("Факторіал дозволено лише для 0 ≤ HP ≤ 6", { needsTarget: true });
+    if (def.id === "fact" && (!isIntegerHp(th) || th.value > 6 || th.value < 0)) return fail("Факторіал дозволено лише для цілих HP від 0 до 6", { needsTarget: true });
+    if (def.id === "mirror" && !isIntegerHp(th)) return fail("Дзеркало цифр доступне лише для цілого HP", { needsTarget: true });
     if (def.id === "sqrt" && th.value < 0) return fail("Квадратний корінь від’ємного HP не є дійсним. Спочатку застосуйте |x|.", { needsTarget: true });
+    if (numericMultiplier(def.id) !== null && isFractionHp(th)) {
+      if (move.fractionPart === undefined) return fail("Оберіть чисельник або знаменник", { needsFractionPart: true });
+      if (move.fractionPart !== "numerator" && move.fractionPart !== "denominator") return fail("Недопустима частина дробу");
+    } else if (move.fractionPart !== undefined) return fail("Вибір частини доступний лише для множення дробу");
     return { ok: true, reason: "", needsZone: false, needsRoot: false, needsTarget: true, zones: [] };
   }
 
@@ -289,6 +293,13 @@ export function legalMoves(state: GameState, actor: Side): Move[] {
       const zones: (Zone | undefined)[] = th.kind !== "number" && def.zones ? ["left", "right", "both"] : [undefined];
       if (th.kind === "number" && !def.onNumber) continue;
       if (th.kind !== "number" && !def.onEquation) continue;
+      if (numericMultiplier(def.id) !== null && th.kind === "number" && isFractionHp(th)) {
+        for (const fractionPart of ["numerator", "denominator"] as const) {
+          const move: Move = { cardUid: inst.uid, target, fractionPart };
+          if (checkMove(state, actor, move).ok) moves.push(move);
+        }
+        continue;
+      }
       if (def.id === "substitute") {
         for (const substitution of SUBSTITUTION_SHIFTS) {
           const move: Move = { cardUid: inst.uid, target, substitution };
@@ -322,6 +333,7 @@ export function canCompleteMove(state: GameState, actor: Side, partial: Move): b
     (partial.target === undefined || move.target === partial.target) &&
     (partial.zone === undefined || move.zone === partial.zone) &&
     (partial.substitution === undefined || move.substitution === partial.substitution) &&
+    (partial.fractionPart === undefined || move.fractionPart === partial.fractionPart) &&
     (partial.root === undefined || (move.root !== undefined && Math.abs(move.root - partial.root) < 1e-6))
   );
 }
@@ -419,54 +431,36 @@ function applyEffect(state: GameState, actor: Side, target: Side, id: CardId, mo
   }
 
   if (hp.kind === "number") {
-    const v = hp.value;
-    let out: number | null = null;
-    switch (id) {
-      case "plus1": out = clampHp(v + 1); break;
-      case "plus3": out = clampHp(v + 3); break;
-      case "minus1": out = clampHp(v - 1); break;
-      case "minus3": out = clampHp(v - 3); break;
-      case "times2": out = clampHp(v * 2); break;
-      case "div2": out = clampHp(Math.floor(v / 2)); break;
-      case "square": out = clampHp(v * v); break;
-      case "sqrt": out = clampHp(Math.floor(Math.sqrt(v))); break;
-      case "abs": out = clampHp(Math.abs(v)); break;
-      case "fact": out = clampHp(factorial(v)); break;
-      case "mod3": out = clampHp(((v % 3) + 3) % 3); break;
-      case "pow0": case "zeroFact": out = 1; break;
-      case "times0": out = 0; break;
-      case "mirror": out = reverseDigits(v); break;
-      case "div0":
-        t.hp = { kind: "number", value: v, divisionByZero: true };
-        push(state, `${t.name}: колапс після ÷0. HP не визначено; попереднє HP ${v} збережено для Відкату. Один хід на порятунок.`, "danger");
-        state.lastEvent = { side: target, kind: "danger", at: Date.now() };
-        return;
-      case "restore":
-        t.hp = { kind: "number", value: v };
-        push(state, `Відкат: скасовано ÷0, HP ${t.name} відновлено до ${v}.`, "good");
-        state.lastEvent = { side: target, kind: "heal", at: Date.now() };
-        return;
-      case "xcard":
-        t.hp = { kind: "equation", poly: [-v, 1] };
-        push(state, `HP ${v} перетворено на рівняння ${describePoly([-v, 1])}.`, "epic");
-        state.lastEvent = { side: target, kind: "transform", at: Date.now() };
-        return;
-      case "ycard":
-        t.hp = { kind: "graph", poly: [-v, 1] };
-        push(state, `Битву переведено у площину: f(x) = ${describePoly([-v, 1]).replace(" = 0", "")}.`, "epic");
-        state.lastEvent = { side: target, kind: "transform", at: Date.now() };
-        return;
-      default: return;
+    const beforeLabel = numericLabel(hp);
+    if (id === "div0" || (id === "times0" && move.fractionPart === "denominator")) {
+      t.hp = { ...hp, divisionByZero: true };
+      push(state, `${t.name}: колапс після ÷0. HP не визначено; попереднє HP ${beforeLabel} збережено для Відкату. Один хід на порятунок.`, "danger");
+      state.lastEvent = { side: target, kind: "danger", at: Date.now() };
+      return;
     }
-    t.hp = { kind: "number", value: out ?? v };
-    const delta = out! - v;
-    if (delta !== 0) {
-      push(state, `HP ${t.name}: ${v} → ${out}${delta > 0 ? " (+)" : " (−)"}.`, delta > 0 ? "good" : "bad");
+    if (id === "restore") {
+      const { divisionByZero: _, ...restored } = hp;
+      t.hp = restored;
+      push(state, `Відкат: скасовано ÷0, HP ${t.name} відновлено до ${numericLabel(restored)}.`, "good");
+      state.lastEvent = { side: target, kind: "heal", at: Date.now() };
+      return;
+    }
+    if (id === "xcard" || id === "ycard") {
+      const poly = numericPoly(hp);
+      t.hp = { kind: id === "xcard" ? "equation" : "graph", poly };
+      push(state, `HP ${beforeLabel} перетворено на ${id === "xcard" ? "рівняння" : "графік"} ${describePoly(poly)}.`, "epic");
+      state.lastEvent = { side: target, kind: "transform", at: Date.now() };
+      return;
+    }
+    const out = applyNumeric(hp, id, move.fractionPart);
+    t.hp = out;
+    const afterLabel = numericLabel(out);
+    if (afterLabel !== beforeLabel) {
+      const delta = out.value - hp.value;
+      push(state, `HP ${t.name}: ${beforeLabel} → ${afterLabel}${move.fractionPart ? ` · ${move.fractionPart === "numerator" ? "чисельник" : "знаменник"} ×${numericMultiplier(id)}` : ""}.`, delta > 0 ? "good" : "bad");
       state.lastEvent = { side: target, kind: delta > 0 ? "heal" : "hit", at: Date.now() };
-    } else {
-      push(state, `HP ${t.name} лишається ${v}.`, "info");
-    }
-    if (out === 0) push(state, `${t.name} входить у стан «Обнулення»!`, "danger");
+    } else push(state, `HP ${t.name} лишається ${beforeLabel}.`, "info");
+    if (isZeroHp(out)) push(state, `${t.name} входить у стан «Обнулення»!`, "danger");
     return;
   }
 
@@ -520,9 +514,8 @@ function applyEffect(state: GameState, actor: Side, target: Side, id: CardId, mo
       break;
     case "cancel": {
       const roots = realRoots(poly);
-      const val = roots.length ? clampHp(Math.floor(Math.max(...roots))) : 1;
-      t.hp = { kind: "number", value: val };
-      push(state, `Скасування: ${describePoly(poly)} → HP = ${val}.`, "good");
+      t.hp = roots.length ? hpFromRoot(poly, Math.max(...roots)) : { kind: "number", value: 1 };
+      push(state, `Скасування: ${describePoly(poly)} → HP = ${hpLabel(t.hp)}.`, "good");
       state.lastEvent = { side: target, kind: "transform", at: Date.now() };
       return;
     }
@@ -580,11 +573,12 @@ function applyEffect(state: GameState, actor: Side, target: Side, id: CardId, mo
         state.lastEvent = { side: target, kind: "hit", at: Date.now() };
         return;
       }
-      const val = clampHp(Math.floor(chosen.value.re));
-      t.hp = { kind: "number", value: val };
-      push(state, `${def.name}: корінь ${fmtNum(chosen.value.re)} → HP = ${val}. Рівняння скасовано.`, val === 0 ? "danger" : "good");
-      state.lastEvent = { side: target, kind: val === 0 ? "hit" : "heal", at: Date.now() };
-      if (val === 0) push(state, `${t.name} входить у стан «Обнулення»!`, "danger");
+      const out = hpFromRoot(poly, chosen.value.re);
+      t.hp = out;
+      const zero = isZeroHp(out);
+      push(state, `${def.name}: корінь ${fmtNum(chosen.value.re)} → HP = ${hpLabel(out)}. Рівняння скасовано.`, zero ? "danger" : "good");
+      state.lastEvent = { side: target, kind: zero ? "hit" : "heal", at: Date.now() };
+      if (zero) push(state, `${t.name} входить у стан «Обнулення»!`, "danger");
       return;
     }
   }

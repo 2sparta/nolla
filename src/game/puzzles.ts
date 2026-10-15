@@ -1,5 +1,7 @@
 import { createGame, isCritical, push } from "./engine";
 import { realRoots } from "./math";
+import { fraction } from "./fractions";
+import { hpFromFraction, numericLabel } from "./numeric";
 import type { CardId, GameState } from "./types";
 
 export interface PuzzleDef {
@@ -222,5 +224,35 @@ export const PUZZLES: PuzzleDef[] = [
       "Задача 10. Ділення на нуль більше не завершує числову дуель миттєво. Є один хід для порятунку.",
     ),
     solved: (s) => s.players[0].hp.kind === "number" && s.players[0].hp.value === -7 && !isCritical(s.players[0].hp).critical,
+  },
+  {
+    id: "fraction-half",
+    index: "11",
+    title: "Половина — не нуль",
+    brief: "У супротивника 1 HP. Поділіть його навпіл, не створюючи Обнулення.",
+    goal: "Отримати рівно 1/2 HP у супротивника",
+    hint: "Зіграйте ÷2: 1 ÷ 2 = 1/2. Дроби більше не округлюються до цілих.",
+    moves: 1,
+    build: () => base(
+      { kind: "number", value: 12 }, { kind: "number", value: 1 },
+      ["div2", "minus1", "times2"], [], 1,
+      "Задача 11. Точність важлива: 1/2 HP не дорівнює нулю.",
+    ),
+    solved: (s) => s.players[1].hp.kind === "number" && numericLabel(s.players[1].hp) === "1/2" && !isCritical(s.players[1].hp).critical,
+  },
+  {
+    id: "fraction-denominator",
+    index: "12",
+    title: "Знаменник вирішує",
+    brief: "У супротивника 3/4 HP. Картою ×2 отримайте 3/8.",
+    goal: "Помножити знаменник та отримати 3/8 HP у супротивника",
+    hint: "Оберіть ×2 → супротивника → знаменник. Чисельник дав би 3/2, а знаменник дає 3/8.",
+    moves: 1,
+    build: () => base(
+      { kind: "number", value: 12 }, hpFromFraction(fraction(3, 4)),
+      ["times2", "plus1", "minus1"], [], 1,
+      "Задача 12. Оберіть частину дробу перед множенням.",
+    ),
+    solved: (s) => s.players[1].hp.kind === "number" && numericLabel(s.players[1].hp) === "3/8",
   },
 ];

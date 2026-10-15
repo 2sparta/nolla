@@ -7,7 +7,7 @@ import type { HpState, Mode, PlayerState } from "../game/types";
 import { cn } from "../utils/cn";
 
 const DEMO: { hp: HpState; caption: string }[] = [
-  { hp: { kind: "number", value: 20 }, caption: "HP — ціле число. Його можна множити, ділити, підносити до степеня." },
+  { hp: { kind: "number", value: 20 }, caption: "HP може бути цілим або дробовим. 1 ÷ 2 = 1/2, а не 0." },
   { hp: { kind: "number", value: -7 }, caption: "HP може бути від’ємним: 2 − 3 = −1. Критичний стан — лише рівно 0." },
   { hp: { kind: "number", value: 7 }, caption: "Карта «Модуль» |x|: |−7| = 7. Змінює знак від’ємного числа." },
   { hp: { kind: "equation", poly: [-20, 1] }, caption: "Карта «x»: HP перетворюється на рівняння x − 20 = 0." },

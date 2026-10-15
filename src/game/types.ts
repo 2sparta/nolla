@@ -1,11 +1,21 @@
 import type { Poly } from "./math";
+import type { Fraction } from "./fractions";
 
 export type Mode = "classic" | "speed" | "equations" | "graphs" | "puzzle";
 export type Side = 0 | 1;
 export type Zone = "left" | "right" | "both";
 
+export interface NumericHp {
+  kind: "number";
+  value: number;
+  fraction?: Fraction;
+  approximate?: boolean;
+  divisionByZero?: boolean;
+}
+
+export type FractionPart = "numerator" | "denominator";
 export type HpState =
-  | { kind: "number"; value: number; divisionByZero?: boolean }
+  | NumericHp
   | { kind: "equation"; poly: Poly }
   | { kind: "graph"; poly: Poly };
 
@@ -73,6 +83,7 @@ export interface Move {
   zone?: Zone;
   root?: number;
   substitution?: number;
+  fractionPart?: FractionPart;
 }
 
 export type Phase = "playing" | "finalSeries" | "gameover";
