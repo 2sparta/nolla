@@ -107,7 +107,7 @@ export const PUZZLES: PuzzleDef[] = [
     title: "Ділення на нуль",
     brief: "Супротивник уже в режимі графіка. Добийте його забороненою операцією.",
     goal: "Перемогти цього ходу",
-    hint: "÷0 на числі й на графіку — миттєва поразка. На рівнянні — лише колапс у 1.",
+    hint: "÷0 на графіку — миттєва поразка. На числі є хід для Відкату або Обміну; на рівнянні HP стає 1.",
     moves: 1,
     build: () =>
       base(
@@ -192,5 +192,35 @@ export const PUZZLES: PuzzleDef[] = [
       "Задача 08. Модуль змінює знак від’ємного HP і зберігає його величину.",
     ),
     solved: (s) => s.players[0].hp.kind === "number" && s.players[0].hp.value === 7,
+  },
+  {
+    id: "substitution",
+    index: "09",
+    title: "Заміни змінну",
+    brief: "Ваше рівняння x² − 5x = 0 має небезпечний корінь 0. Позбудьтеся його підстановкою.",
+    goal: "Зберегти рівняння та прибрати нуль серед його коренів",
+    hint: "x → x + 1: (x+1)² − 5(x+1) = x² − 3x − 4. Нові корені −1 та 4.",
+    moves: 1,
+    build: () => base(
+      { kind: "equation", poly: [0, -5, 1] }, { kind: "number", value: 12 },
+      ["substitute", "times2", "xcard"], [], 1,
+      "Задача 09. Підстановка змінює всі доданки, що містять x, та зсуває кожен корінь.",
+    ),
+    solved: (s) => s.players[0].hp.kind === "equation" && !isCritical(s.players[0].hp).critical,
+  },
+  {
+    id: "division-rescue",
+    index: "10",
+    title: "Повернення після колапсу",
+    brief: "Після атаки ÷0 ваше HP не визначено. До атаки воно дорівнювало −7.",
+    goal: "Скасувати колапс та повернути власне HP до −7",
+    hint: "Відкат ↶ повертає попереднє числове HP. 0! та звичайні операції не діють на невизначене значення.",
+    moves: 1,
+    build: () => base(
+      { kind: "number", value: -7, divisionByZero: true }, { kind: "number", value: 12 },
+      ["restore", "zeroFact", "plus3"], [], 1,
+      "Задача 10. Ділення на нуль більше не завершує числову дуель миттєво. Є один хід для порятунку.",
+    ),
+    solved: (s) => s.players[0].hp.kind === "number" && s.players[0].hp.value === -7 && !isCritical(s.players[0].hp).critical,
   },
 ];

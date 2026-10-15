@@ -1,5 +1,8 @@
 import {
   clampHp,
+  substituteVariable,
+  SUBSTITUTION_SHIFTS,
+  substitutionLabel,
   degree,
   evalPoly,
   factorial,
@@ -129,11 +132,12 @@ export function realRootsOf(hp: HpState): number[] {
 export interface CriticalInfo {
   critical: boolean;
   reason: string;
-  kind: "zero" | "root-zero" | "no-roots" | null;
+  kind: "zero" | "root-zero" | "no-roots" | "division-zero" | null;
 }
 
 export function isCritical(hp: HpState): CriticalInfo {
   if (hp.kind === "number") {
+    if (hp.divisionByZero) return { critical: true, reason: "Колапс після ÷0: потрібен Відкат або Обмін", kind: "division-zero" };
     return hp.value === 0
       ? { critical: true, reason: "Обнулення: HP = 0", kind: "zero" }
       : { critical: false, reason: "", kind: null };
@@ -157,7 +161,7 @@ export function isCritical(hp: HpState): CriticalInfo {
 
 /** «Сила» HP для оцінки ШІ */
 export function hpStrength(hp: HpState): number {
-  if (hp.kind === "number") return hp.value === 0 ? -60 : Math.abs(hp.value);
+  if (hp.kind === "number") return isCritical(hp).critical ? -60 : Math.abs(hp.value);
   if (isCritical(hp).critical) return -60;
   const roots = realRoots(hp.poly);
   const best = roots.length ? Math.max(...roots.map((r) => Math.abs(Math.floor(r)))) : 0;
@@ -165,19 +169,21 @@ export function hpStrength(hp: HpState): number {
 }
 
 export function hpLabel(hp: HpState): string {
-  if (hp.kind === "number") return String(hp.value);
+  if (hp.kind === "number") return hp.divisionByZero ? "не визначено (÷0)" : String(hp.value);
   return polyToString(hp.poly);
 }
 
 /* ---------------- легальність ---------------- */
 
 export const RESCUE_IDS: CardId[] = ["pow0", "zeroFact", "swap"];
+export const DIVISION_RESCUE_IDS: CardId[] = ["restore", "swap"];
 
 export interface Legality {
   ok: boolean;
   reason: string;
   needsZone: boolean;
   needsRoot: boolean;
+  needsSubstitution?: boolean;
   needsTarget: boolean;
   zones: Zone[];
 }
@@ -198,8 +204,13 @@ export function checkMove(state: GameState, actor: Side, move: Move): Legality {
   if (!inFinal && p.oo < def.cost) return fail(`Потрібно ${def.cost} ОО, у вас ${p.oo}`);
 
   const crit = isCritical(p.hp);
-  if (crit.critical && p.hp.kind === "number" && !RESCUE_IDS.includes(def.id)) {
-    return fail("Стан «Обнулення»: доступні лише 0!, x⁰ або ⇄");
+  if (crit.critical && p.hp.kind === "number") {
+    if (p.hp.divisionByZero && !DIVISION_RESCUE_IDS.includes(def.id)) {
+      return fail("Колапс після ÷0: доступні лише Відкат або Обмін");
+    }
+    if (!p.hp.divisionByZero && !RESCUE_IDS.includes(def.id)) {
+      return fail("Стан «Обнулення»: доступні лише 0!, x⁰ або ⇄");
+    }
   }
 
   // карта-обмін діє на обох — ціль не потрібна
@@ -216,6 +227,8 @@ export function checkMove(state: GameState, actor: Side, move: Move): Legality {
   const th = t.hp;
 
   if (th.kind === "number") {
+    if (th.divisionByZero && def.id !== "restore") return fail("HP не визначено після ÷0; потрібен Відкат або Обмін", { needsTarget: true });
+    if (def.id === "restore" && !th.divisionByZero) return fail("Відкат доступний лише після ділення на нуль");
     if (!def.onNumber) {
       return fail(def.category === "helper" ? "Потрібне рівняння або графік" : "Не діє на числове HP", {
         needsTarget: true,
@@ -228,6 +241,12 @@ export function checkMove(state: GameState, actor: Side, move: Move): Legality {
 
   // рівняння або графік
   if (!def.onEquation) return fail("Не діє на рівняння чи графік", { needsTarget: true });
+
+  if (def.id === "substitute") {
+    if (th.kind !== "equation") return fail("Заміна змінної доступна лише для рівнянь", { needsTarget: true });
+    if (move.substitution === undefined) return fail("Оберіть підстановку", { needsSubstitution: true });
+    if (!SUBSTITUTION_SHIFTS.some((shift) => shift === move.substitution)) return fail("Доступні підстановки x ± 1 або x ± 3");
+  }
 
   if (def.category === "helper") {
     const av = helperAvailability(def.id, th.poly);
@@ -270,6 +289,13 @@ export function legalMoves(state: GameState, actor: Side): Move[] {
       const zones: (Zone | undefined)[] = th.kind !== "number" && def.zones ? ["left", "right", "both"] : [undefined];
       if (th.kind === "number" && !def.onNumber) continue;
       if (th.kind !== "number" && !def.onEquation) continue;
+      if (def.id === "substitute") {
+        for (const substitution of SUBSTITUTION_SHIFTS) {
+          const move: Move = { cardUid: inst.uid, target, substitution };
+          if (checkMove(state, actor, move).ok) moves.push(move);
+        }
+        continue;
+      }
       if (th.kind !== "number" && def.category === "helper") {
         if (!helperAvailability(def.id, th.poly).ok) continue;
         if (def.needsRoot) {
@@ -295,6 +321,7 @@ export function canCompleteMove(state: GameState, actor: Side, partial: Move): b
     move.cardUid === partial.cardUid &&
     (partial.target === undefined || move.target === partial.target) &&
     (partial.zone === undefined || move.zone === partial.zone) &&
+    (partial.substitution === undefined || move.substitution === partial.substitution) &&
     (partial.root === undefined || (move.root !== undefined && Math.abs(move.root - partial.root) < 1e-6))
   );
 }
@@ -410,7 +437,14 @@ function applyEffect(state: GameState, actor: Side, target: Side, id: CardId, mo
       case "times0": out = 0; break;
       case "mirror": out = reverseDigits(v); break;
       case "div0":
-        setWinner(state, target === 0 ? 1 : 0, `${t.name} — ділення на нуль. Операція заборонена.`);
+        t.hp = { kind: "number", value: v, divisionByZero: true };
+        push(state, `${t.name}: колапс після ÷0. HP не визначено; попереднє HP ${v} збережено для Відкату. Один хід на порятунок.`, "danger");
+        state.lastEvent = { side: target, kind: "danger", at: Date.now() };
+        return;
+      case "restore":
+        t.hp = { kind: "number", value: v };
+        push(state, `Відкат: скасовано ÷0, HP ${t.name} відновлено до ${v}.`, "good");
+        state.lastEvent = { side: target, kind: "heal", at: Date.now() };
         return;
       case "xcard":
         t.hp = { kind: "equation", poly: [-v, 1] };
@@ -443,6 +477,12 @@ function applyEffect(state: GameState, actor: Side, target: Side, id: CardId, mo
   let note = "";
 
   switch (id) {
+    case "substitute": {
+      const shift = move.substitution!;
+      p = substituteVariable(poly, shift);
+      note = `підстановка ${substitutionLabel(shift)}, кожен корінь зміщено на ${-shift}`;
+      break;
+    }
     case "plus1": case "plus3": case "minus1": case "minus3": {
       const n = id === "plus1" ? 1 : id === "plus3" ? 3 : id === "minus1" ? -1 : -3;
       if (zone === "left") { p = addConst(poly, n); note = `ліва частина ${n > 0 ? "+" : "−"} ${Math.abs(n)}`; }

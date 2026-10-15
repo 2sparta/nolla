@@ -55,7 +55,13 @@ export function HpPanel({ player, startHp, side, active, showGraph }: Props) {
         )}
       </div>
 
-      {hp.kind === "number" ? (
+      {hp.kind === "number" && hp.divisionByZero ? (
+        <div className="mt-3 rounded-lg border border-neon-red/40 bg-neon-red/10 p-3" role="status">
+          <div className="font-display text-2xl font-black text-neon-red">HP НЕ ВИЗНАЧЕНО</div>
+          <div className="mt-1 font-mono text-xs text-white/60">До ÷0: {hp.value} HP. Відкат ↶ поверне це значення; Обмін ⇄ передасть стан супернику.</div>
+          <div className="mt-2 font-mono text-xs text-neon-amber">Виправте до кінця свого ходу.</div>
+        </div>
+      ) : hp.kind === "number" ? (
         <NumberHp value={hp.value} startHp={startHp} delta={delta} accent={accent} side={side} />
       ) : (
         <EquationHp hp={hp} delta={delta} showGraph={showGraph} />

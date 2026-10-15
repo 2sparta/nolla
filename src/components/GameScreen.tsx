@@ -167,7 +167,7 @@ export function GameScreen({ mode, puzzleIndex = 0, onExit, onOpenPuzzle }: Prop
     }
     const probe = checkMove(state, 0, { cardUid: uid });
     if (probe.ok) return doMove({ cardUid: uid });
-    if (probe.needsTarget || probe.needsZone || probe.needsRoot) return setPending({ cardUid: uid });
+    if (probe.needsTarget || probe.needsZone || probe.needsRoot || probe.needsSubstitution) return setPending({ cardUid: uid });
     setToast(probe.reason);
   };
 
@@ -176,7 +176,7 @@ export function GameScreen({ mode, puzzleIndex = 0, onExit, onOpenPuzzle }: Prop
     const next: Pending = { ...pending, target: t };
     const probe = checkMove(state, 0, next);
     if (probe.ok) return doMove(next);
-    if (probe.needsZone || probe.needsRoot) return setPending(next);
+    if (probe.needsZone || probe.needsRoot || probe.needsSubstitution) return setPending(next);
     setToast(probe.reason);
     setPending(next);
   };
@@ -339,7 +339,7 @@ export function GameScreen({ mode, puzzleIndex = 0, onExit, onOpenPuzzle }: Prop
                   {myCrit.reason}. Виправте до кінця свого ходу — інакше поразка.
                 </span>
                 <span className="ml-auto font-mono text-[10px] text-neon-amber/80">
-                  {me.hp.kind === "number" ? "легальні лише 0!, x⁰ та ⇄" : "зсуньте корінь, виріжте нуль або розв'яжіть рівняння"}
+                  {me.hp.kind === "number" ? me.hp.divisionByZero ? "колапс після ÷0: зіграйте Відкат ↶ або Обмін ⇄" : "легальні лише 0!, x⁰ та ⇄" : "зсуньте корінь, виріжте нуль або розв'яжіть рівняння"}
                 </span>
               </div>
             )}
@@ -354,6 +354,7 @@ export function GameScreen({ mode, puzzleIndex = 0, onExit, onOpenPuzzle }: Prop
               onTarget={onTarget}
               onZone={onZone}
               onRoot={onRoot}
+              onSubstitution={(substitution) => pending && doMove({ ...pending, substitution })}
               onCancel={() => setPending(null)}
             />
           )}
@@ -564,9 +565,9 @@ function Arena({ state }: { state: GameState }) {
             <div className="flex h-[180px] items-center justify-center">
               <div className="text-center">
                 <div className="font-display text-5xl font-black tabular-nums" style={{ color: p.side === 0 ? "#3ce7ff" : "#ff3d8b", textShadow: "0 0 30px currentColor" }}>
-                  {p.hp.value}
+                  {p.hp.divisionByZero ? "∅" : p.hp.value}
                 </div>
-                <div className="mt-1 font-mono text-[9.5px] tracking-[0.3em] text-white/30">HP · ЧИСЛО</div>
+                <div className="mt-1 font-mono text-[9.5px] tracking-[0.3em] text-white/30">HP · {p.hp.divisionByZero ? "КОЛАПС ÷0" : "ЧИСЛО"}</div>
               </div>
             </div>
           ) : (
@@ -579,7 +580,8 @@ function Arena({ state }: { state: GameState }) {
 }
 
 function ArenaNumber({ hp, color, label, align }: { hp: GameState["players"][0]["hp"]; color: string; label: string; align: "left" | "right" }) {
-  const v = hp.kind === "number" ? hp.value : 0;
+  const collapsed = hp.kind === "number" && hp.divisionByZero;
+  const v = collapsed ? "∅" : hpLabel(hp);
   return (
     <div className={cn("text-center", align === "right" ? "text-right" : "text-left")}>
       <div className="font-mono text-[9.5px] tracking-[0.3em] text-white/30">{label}</div>
@@ -590,7 +592,7 @@ function ArenaNumber({ hp, color, label, align }: { hp: GameState["players"][0][
       >
         {v}
       </div>
-      <div className="font-mono text-[9.5px] tracking-[0.3em] text-white/25">HP</div>
+      <div className="font-mono text-[9.5px] tracking-[0.3em] text-white/25">{collapsed ? "КОЛАПС ÷0" : "HP"}</div>
     </div>
   );
 }

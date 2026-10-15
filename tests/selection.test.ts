@@ -16,7 +16,7 @@ function setup(id: CardId) {
 function buttons(state: GameState, pending: Move) {
   const html = renderToStaticMarkup(createElement(ActionDock, {
     state, pending,
-    onTarget: () => {}, onZone: () => {}, onRoot: () => {}, onCancel: () => {},
+    onTarget: () => {}, onZone: () => {}, onRoot: () => {}, onSubstitution: () => {}, onCancel: () => {},
   }));
   return [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)]
     .map((match) => ({ disabled: /\bdisabled=/.test(match[1]), content: match[2] }));

@@ -1,16 +1,11 @@
 import { CARDS } from "../game/cards";
 import { rootOptions } from "../game/cards";
 import { canCompleteMove, checkMove, hpLabel, isCritical, previewMove } from "../game/engine";
-import { fmtNum } from "../game/math";
-import type { GameState, Side, Zone } from "../game/types";
+import { SUBSTITUTION_SHIFTS, substitutionLabel, fmtNum } from "../game/math";
+import type { GameState, Move, Side, Zone } from "../game/types";
 import { cn } from "../utils/cn";
 
-export interface Pending {
-  cardUid: string;
-  target?: Side;
-  zone?: Zone;
-  root?: number;
-}
+export type Pending = Move;
 
 interface Props {
   state: GameState;
@@ -18,6 +13,7 @@ interface Props {
   onTarget: (t: Side) => void;
   onZone: (z: Zone) => void;
   onRoot: (r: number) => void;
+  onSubstitution: (shift: number) => void;
   onCancel: () => void;
 }
 
@@ -27,14 +23,14 @@ const ZONES: { id: Zone; label: string; hint: string }[] = [
   { id: "both", label: "Обидві частини", hint: "зберігає рівновагу або створює тотожність" },
 ];
 
-export function ActionDock({ state, pending, onTarget, onZone, onRoot, onCancel }: Props) {
+export function ActionDock({ state, pending, onTarget, onZone, onRoot, onSubstitution, onCancel }: Props) {
   const inst = state.players[0].hand.find((c) => c.uid === pending.cardUid);
   if (!inst) return null;
   const def = CARDS[inst.id];
   const probe = checkMove(state, 0, pending);
 
-  const step = probe.ok ? 0 : probe.needsTarget ? 1 : probe.needsZone ? 2 : probe.needsRoot ? 3 : 0;
-  const total = (def.id === "swap" ? 0 : 1) + (probe.needsZone || step > 1 ? 1 : 0) + (def.needsRoot ? 1 : 0) || 1;
+  const step = probe.ok ? 0 : probe.needsTarget ? 1 : probe.needsZone ? 2 : probe.needsRoot ? 3 : probe.needsSubstitution ? 4 : 0;
+  const total = (def.id === "swap" ? 0 : 1) + (def.zones && (probe.needsZone || pending.zone !== undefined) ? 1 : 0) + (def.needsRoot ? 1 : 0) + (def.needsSubstitution ? 1 : 0) || 1;
 
   return (
     <div className="panel pop-in relative z-30 rounded-xl border-neon-cyan/30 px-4 py-3">
@@ -99,7 +95,7 @@ export function ActionDock({ state, pending, onTarget, onZone, onRoot, onCancel 
                     </span>
                   ) : selectable ? (
                     !leg.ok ? (
-                      <span className="text-neon-amber">Далі: {leg.needsRoot ? "оберіть корінь" : "оберіть частину рівняння"}</span>
+                      <span className="text-neon-amber">Далі: {leg.needsRoot ? "оберіть корінь" : leg.needsSubstitution ? "оберіть підстановку" : "оберіть частину рівняння"}</span>
                     ) :
                     crit.critical ? (
                       <span className="text-neon-red">критичний стан: {crit.reason}</span>
@@ -147,6 +143,28 @@ export function ActionDock({ state, pending, onTarget, onZone, onRoot, onCancel 
               </button>
             );
           })}
+        </div>
+      )}
+
+      {step === 4 && (
+        <div>
+          <div className="mb-2 font-mono text-[10.5px] tracking-wider text-white/40">ОБЕРІТЬ ПІДСТАНОВКУ У ВСЕ РІВНЯННЯ</div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {SUBSTITUTION_SHIFTS.map((shift) => {
+              const move = { ...pending, substitution: shift };
+              const sim = previewMove(state, 0, move);
+              const hp = sim?.players[pending.target ?? 0].hp;
+              return (
+                <button key={shift} type="button" disabled={!sim} onClick={() => onSubstitution(shift)}
+                  className="rounded-lg border border-neon-violet/40 bg-neon-violet/10 p-3 text-left transition hover:border-neon-violet hover:bg-neon-violet/20 disabled:opacity-40">
+                  <div className="font-mono text-sm font-bold text-neon-violet">{substitutionLabel(shift)}</div>
+                  <div className="mt-1 font-mono text-[10px] text-white/50">Корені {shift > 0 ? "−" : "+"}{Math.abs(shift)}</div>
+                  {hp && <div className="mt-2 border-t border-white/10 pt-2 font-mono text-[11px] text-white/80">{hpLabel(hp)}</div>}
+                  {hp && isCritical(hp).critical && <div className="mt-1 font-mono text-[10px] text-neon-red">{isCritical(hp).reason}</div>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

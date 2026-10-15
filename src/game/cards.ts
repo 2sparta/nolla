@@ -90,6 +90,18 @@ export const CARDS: Record<CardId, CardDef> = {
     rule: "Порятунок витрачає хід: після нього хід одразу завершується.",
     count: 2, onNumber: true, onEquation: true, zones: false, needsRoot: false, resolves: true,
   },
+  restore: {
+    id: "restore", symbol: "↶", name: "Відкат", cost: 1, category: "rescue", accent: "lime",
+    desc: "Скасовує колапс після ÷0 та повертає попереднє числове HP.",
+    rule: "Лише на себе після ÷0. Дві карти в колоді. Порятунок завершує хід; звичайне HP = 0 не лікує.",
+    count: 2, onNumber: true, onEquation: false, zones: false, needsRoot: false, resolves: false,
+  },
+  substitute: {
+    id: "substitute", symbol: "x↦", name: "Заміна змінної", cost: 2, category: "transform", accent: "violet",
+    desc: "Підставляє x ± 1 або x ± 3 у все рівняння. Оберіть підстановку.",
+    rule: "Лише рівняння будь-якого гравця. x → x + k зміщує кожен корінь на −k; степінь зберігається.",
+    count: 2, onNumber: false, onEquation: true, zones: false, needsRoot: false, needsSubstitution: true, resolves: false,
+  },
   times0: {
     id: "times0", symbol: "×0", name: "Анігіляція", cost: 4, category: "forbidden", accent: "red",
     desc: "HP ×0 → 0. Супротивник входить у стан «Обнулення».",
@@ -98,8 +110,8 @@ export const CARDS: Record<CardId, CardDef> = {
   },
   div0: {
     id: "div0", symbol: "÷0", name: "Ділення на нуль", cost: 5, category: "forbidden", accent: "red",
-    desc: "Заборонена операція. Число або графік — миттєва поразка цілі.",
-    rule: "Число HP: миттєва поразка. Рівняння: колапс у 1. Графік: миттєва поразка.",
+    desc: "Число: колапс із ходом на порятунок. Графік: миттєва поразка.",
+    rule: "Число: врятуйтеся «Відкатом» або «Обміном» до кінця свого ходу. Рівняння: HP = 1. Графік: миттєва поразка.",
     count: 1, onNumber: true, onEquation: true, zones: false, needsRoot: false, resolves: false,
   },
   swap: {

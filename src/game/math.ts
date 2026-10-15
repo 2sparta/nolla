@@ -302,3 +302,17 @@ export function reverseDigits(n: number): number {
   const r = Number(s.split("").reverse().join(""));
   return clampHp(Math.sign(n) * r);
 }
+
+/** Підстановка x → x + shift: p(x + shift), степінь не зростає. */
+export function substituteVariable(p: Poly, shift: number): Poly {
+  let out: Poly = [0];
+  for (let i = p.length - 1; i >= 0; i--) {
+    out = addConst(mulPoly(out, [shift, 1]), p[i]);
+  }
+  return trim(out);
+}
+
+export const SUBSTITUTION_SHIFTS = [-3, -1, 1, 3] as const;
+export function substitutionLabel(shift: number): string {
+  return `x → x ${shift < 0 ? "−" : "+"} ${Math.abs(shift)}`;
+}

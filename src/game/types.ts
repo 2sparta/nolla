@@ -5,7 +5,7 @@ export type Side = 0 | 1;
 export type Zone = "left" | "right" | "both";
 
 export type HpState =
-  | { kind: "number"; value: number }
+  | { kind: "number"; value: number; divisionByZero?: boolean }
   | { kind: "equation"; poly: Poly }
   | { kind: "graph"; poly: Poly };
 
@@ -17,7 +17,7 @@ export interface CardInstance {
 export type CardId =
   | "plus1" | "plus3" | "minus1" | "minus3" | "times2" | "div2" | "square" | "sqrt"
   | "abs" | "fact" | "mod3" | "pow0" | "zeroFact" | "times0" | "div0" | "swap" | "mirror" | "cancel"
-  | "xcard" | "ycard"
+  | "xcard" | "ycard" | "substitute" | "restore"
   | "discriminant" | "vieta" | "factor" | "cardano" | "trigVieta" | "rationalRoot" | "horner" | "graphAnalysis";
 
 export type Accent = "cyan" | "magenta" | "amber" | "lime" | "violet" | "red";
@@ -41,6 +41,7 @@ export interface CardDef {
   zones: boolean;
   /** потребує вибору кореня */
   needsRoot: boolean;
+  needsSubstitution?: boolean;
   /** розв'язує рівняння (HP стає числом) */
   resolves: boolean;
 }
@@ -71,6 +72,7 @@ export interface Move {
   target?: Side;
   zone?: Zone;
   root?: number;
+  substitution?: number;
 }
 
 export type Phase = "playing" | "finalSeries" | "gameover";

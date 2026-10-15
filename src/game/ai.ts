@@ -76,7 +76,9 @@ function simHandId(state: GameState, m: Move) {
 
 function describe(id: string, who: string): string {
   const t: Record<string, string> = {
-    div0: `Розриває тканину математики — ділення на нуль на ${who}`,
+    div0: `Спричиняє колапс діленням на нуль на ${who}`,
+    restore: `Скасовує ділення на нуль та відновлює попереднє HP`,
+    substitute: `Змінює змінну в рівнянні ${who}`,
     times0: `Анігіляція: обнулює ${who}`,
     xcard: `Перетворює HP ${who} на рівняння`,
     ycard: `Викидає ${who} у площину графіка`,
