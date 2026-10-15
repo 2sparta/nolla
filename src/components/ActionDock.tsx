@@ -1,6 +1,6 @@
 import { CARDS } from "../game/cards";
 import { rootOptions } from "../game/cards";
-import { checkMove, hpLabel, isCritical, previewMove } from "../game/engine";
+import { canCompleteMove, checkMove, hpLabel, isCritical, previewMove } from "../game/engine";
 import { fmtNum } from "../game/math";
 import type { GameState, Side, Zone } from "../game/types";
 import { cn } from "../utils/cn";
@@ -63,6 +63,7 @@ export function ActionDock({ state, pending, onTarget, onZone, onRoot, onCancel 
           {([0, 1] as Side[]).map((s) => {
             const p = state.players[s];
             const leg = checkMove(state, 0, { ...pending, target: s });
+            const selectable = canCompleteMove(state, 0, { ...pending, target: s });
             const sim = leg.ok ? previewMove(state, 0, { ...pending, target: s }) : null;
             const after = sim ? hpLabel(sim.players[s].hp) : null;
             const crit = isCritical(p.hp);
@@ -70,11 +71,11 @@ export function ActionDock({ state, pending, onTarget, onZone, onRoot, onCancel 
               <button
                 key={s}
                 type="button"
-                disabled={!leg.ok}
+                disabled={!selectable}
                 onClick={() => onTarget(s)}
                 className={cn(
                   "group rounded-lg border p-3 text-left transition-all duration-200",
-                  leg.ok
+                  selectable
                     ? "border-white/15 bg-white/[0.03] hover:-translate-y-0.5 hover:border-neon-cyan/70 hover:bg-neon-cyan/10"
                     : "cursor-not-allowed border-white/8 bg-black/30 opacity-40",
                 )}
@@ -96,7 +97,10 @@ export function ActionDock({ state, pending, onTarget, onZone, onRoot, onCancel 
                     <span className={sim.winner === 0 ? "font-bold text-neon-lime" : "font-bold text-neon-red"}>
                       {sim.winner === 0 ? "★ МИТТЄВА ПЕРЕМОГА" : "✕ МИТТЄВА ПОРАЗКА"}
                     </span>
-                  ) : leg.ok ? (
+                  ) : selectable ? (
+                    !leg.ok ? (
+                      <span className="text-neon-amber">Далі: {leg.needsRoot ? "оберіть корінь" : "оберіть частину рівняння"}</span>
+                    ) :
                     crit.critical ? (
                       <span className="text-neon-red">критичний стан: {crit.reason}</span>
                     ) : after && after !== hpLabel(p.hp) ? (
@@ -118,17 +122,18 @@ export function ActionDock({ state, pending, onTarget, onZone, onRoot, onCancel 
         <div className="grid gap-2 sm:grid-cols-3">
           {ZONES.map((z) => {
             const leg = checkMove(state, 0, { ...pending, zone: z.id });
+            const selectable = canCompleteMove(state, 0, { ...pending, zone: z.id });
             const sim = leg.ok ? previewMove(state, 0, { ...pending, zone: z.id }) : null;
             const t = sim?.players[pending.target ?? 1];
             return (
               <button
                 key={z.id}
                 type="button"
-                disabled={!leg.ok}
+                disabled={!selectable}
                 onClick={() => onZone(z.id)}
                 className={cn(
                   "rounded-lg border p-2.5 text-left transition-all duration-200",
-                  leg.ok ? "border-white/15 bg-white/[0.03] hover:-translate-y-0.5 hover:border-neon-amber/70 hover:bg-neon-amber/10" : "cursor-not-allowed opacity-40",
+                  selectable ? "border-white/15 bg-white/[0.03] hover:-translate-y-0.5 hover:border-neon-amber/70 hover:bg-neon-amber/10" : "cursor-not-allowed opacity-40",
                 )}
               >
                 <div className="font-display text-[11px] font-black uppercase tracking-wider text-white">{z.label}</div>

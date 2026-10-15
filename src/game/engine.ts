@@ -274,7 +274,8 @@ export function legalMoves(state: GameState, actor: Side): Move[] {
         if (!helperAvailability(def.id, th.poly).ok) continue;
         if (def.needsRoot) {
           for (const opt of rootOptions(def.id, th.poly)) {
-            moves.push({ cardUid: inst.uid, target, root: opt.value.re });
+            const move = { cardUid: inst.uid, target, root: opt.value.re };
+            if (checkMove(state, actor, move).ok) moves.push(move);
           }
           continue;
         }
@@ -286,6 +287,16 @@ export function legalMoves(state: GameState, actor: Side): Move[] {
     }
   }
   return moves;
+}
+
+/** Чи можна доповнити вибрані ціль/частину/корінь до легального ходу. */
+export function canCompleteMove(state: GameState, actor: Side, partial: Move): boolean {
+  return legalMoves(state, actor).some((move) =>
+    move.cardUid === partial.cardUid &&
+    (partial.target === undefined || move.target === partial.target) &&
+    (partial.zone === undefined || move.zone === partial.zone) &&
+    (partial.root === undefined || (move.root !== undefined && Math.abs(move.root - partial.root) < 1e-6))
+  );
 }
 
 /* ---------------- застосування ---------------- */
